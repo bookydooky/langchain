@@ -8,11 +8,12 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.document_loaders import UnstructuredURLLoader
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
+from langchain.chat_models import ChatOpenAI
 
 from dotenv import load_dotenv
 load_dotenv()  # take environment variables from .env (especially openai api key)
 
-st.title("RockyBot: News Research Tool 📈")
+st.title("BookyBot: News Research Tool 📈")
 st.sidebar.title("News Article URLs")
 
 urls = []
@@ -24,29 +25,42 @@ process_url_clicked = st.sidebar.button("Process URLs")
 file_path = "faiss_store_openai.pkl"
 
 main_placeholder = st.empty()
-llm = OpenAI(temperature=0.9, max_tokens=500)
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.9, max_tokens=500)
 
 if process_url_clicked:
-    # load data
+    # Load data
     loader = UnstructuredURLLoader(urls=urls)
     main_placeholder.text("Data Loading...Started...✅✅✅")
     data = loader.load()
-    # split data
+    if not data:
+        st.error("No data could be loaded from the provided URLs.")
+        print("Data loading failed. Check the URLs.")
+    else:
+        print(f"Loaded data: {data}")
+
+    # Split data
     text_splitter = RecursiveCharacterTextSplitter(
         separators=['\n\n', '\n', '.', ','],
         chunk_size=1000
     )
     main_placeholder.text("Text Splitter...Started...✅✅✅")
     docs = text_splitter.split_documents(data)
-    # create embeddings and save it to FAISS index
-    embeddings = OpenAIEmbeddings()
-    vectorstore_openai = FAISS.from_documents(docs, embeddings)
-    main_placeholder.text("Embedding Vector Started Building...✅✅✅")
-    time.sleep(2)
+    if not docs:
+        st.error("No documents could be created from the loaded data.")
+        print("Text splitting failed. Check the input data format.")
+    else:
+        print(f"Split documents: {docs}")
 
-    # Save the FAISS index to a pickle file
-    with open(file_path, "wb") as f:
-        pickle.dump(vectorstore_openai, f)
+    # Create embeddings and save to FAISS index
+    if docs:
+        embeddings = OpenAIEmbeddings(openai_api_key=os.getenv("OPENAI_API_KEY"))
+        vectorstore_openai = FAISS.from_documents(docs, embeddings)
+        main_placeholder.text("Embedding Vector Started Building...✅✅✅")
+        time.sleep(2)
+
+        # Save the FAISS index to a pickle file
+        with open(file_path, "wb") as f:
+            pickle.dump(vectorstore_openai, f)
 
 query = main_placeholder.text_input("Question: ")
 if query:
